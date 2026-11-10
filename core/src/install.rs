@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::archive::{extract_tar_gz, extract_zip};
-use crate::pinned::{install_dir_name, Asset, ArchiveKind, NETCOREDBG_VERSION};
+use crate::pinned::{install_dir_name, ArchiveKind, Asset, NETCOREDBG_VERSION};
 use crate::verify::verify_sha256;
 
 fn partial_dir_name() -> String {
@@ -58,10 +58,13 @@ pub fn install(
 /// Best effort: drop installs of other versions and abandoned partial extractions.
 pub fn prune_stale(root: &Path) {
     let keep = install_dir_name();
-    let Ok(entries) = fs::read_dir(root) else { return };
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        let stale = (name.starts_with("netcoredbg-") && name != keep) || name.starts_with(".partial-");
+        let stale =
+            (name.starts_with("netcoredbg-") && name != keep) || name.starts_with(".partial-");
         if stale && entry.path().is_dir() {
             let _ = fs::remove_dir_all(entry.path());
         }
@@ -132,7 +135,12 @@ mod tests {
     #[test]
     fn prune_removes_other_versions_only() {
         let root = scratch("prune");
-        for d in ["netcoredbg-1.0.0", ".partial-9", &install_dir_name(), "unrelated"] {
+        for d in [
+            "netcoredbg-1.0.0",
+            ".partial-9",
+            &install_dir_name(),
+            "unrelated",
+        ] {
             fs::create_dir_all(root.join(d)).unwrap();
         }
         prune_stale(&root);

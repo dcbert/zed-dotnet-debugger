@@ -37,19 +37,27 @@ fn require_adapter(name: &str) -> Result<()> {
     if name == ADAPTER {
         Ok(())
     } else {
-        Err(format!("this extension only provides the `{ADAPTER}` adapter, not `{name}`"))
+        Err(format!(
+            "this extension only provides the `{ADAPTER}` adapter, not `{name}`"
+        ))
     }
 }
 
 fn tail(text: &str) -> String {
     let text = text.trim();
     let start = text.len().saturating_sub(600);
-    let start = (start..text.len()).find(|i| text.is_char_boundary(*i)).unwrap_or(text.len());
+    let start = (start..text.len())
+        .find(|i| text.is_char_boundary(*i))
+        .unwrap_or(text.len());
     text[start..].to_string()
 }
 
 impl DotnetDebugger {
-    fn resolve_binary(&mut self, user_path: Option<String>, worktree: &zed::Worktree) -> Result<String> {
+    fn resolve_binary(
+        &mut self,
+        user_path: Option<String>,
+        worktree: &zed::Worktree,
+    ) -> Result<String> {
         if let Some(path) = user_path.filter(|p| !p.trim().is_empty()) {
             return Ok(path);
         }
@@ -70,15 +78,25 @@ impl DotnetDebugger {
 fn install_pinned() -> Result<String> {
     let (os, arch) = zed::current_platform();
     let asset = pinned::asset_for(host_os(os), host_arch(arch))?;
-    let root = env::current_dir().map_err(|e| format!("cannot resolve extension directory: {e}"))?;
+    let root =
+        env::current_dir().map_err(|e| format!("cannot resolve extension directory: {e}"))?;
 
     if let Some(exe) = install::find_installed(&root, asset) {
         return Ok(exe.to_string_lossy().into_owned());
     }
 
     let archive_path = format!(".download-{}", asset.name);
-    zed::download_file(&pinned::download_url(asset), &archive_path, zed::DownloadedFileType::Uncompressed)
-        .map_err(|e| format!("failed to download netcoredbg {}: {e}", pinned::NETCOREDBG_VERSION))?;
+    zed::download_file(
+        &pinned::download_url(asset),
+        &archive_path,
+        zed::DownloadedFileType::Uncompressed,
+    )
+    .map_err(|e| {
+        format!(
+            "failed to download netcoredbg {}: {e}",
+            pinned::NETCOREDBG_VERSION
+        )
+    })?;
     let bytes = fs::read(&archive_path);
     let _ = fs::remove_file(&archive_path);
     let bytes = bytes.map_err(|e| format!("cannot read downloaded archive: {e}"))?;
@@ -115,10 +133,22 @@ fn query_msbuild(
     locator::parse_msbuild_properties(&stdout)
 }
 
-fn build_scenario_task(label: String, command: String, args: Vec<String>, env: zed::EnvVars, cwd: Option<String>) -> zed::BuildTaskDefinition {
+fn build_scenario_task(
+    label: String,
+    command: String,
+    args: Vec<String>,
+    env: zed::EnvVars,
+    cwd: Option<String>,
+) -> zed::BuildTaskDefinition {
     zed::BuildTaskDefinition::Template(zed::BuildTaskDefinitionTemplatePayload {
         locator_name: Some(LOCATOR.to_string()),
-        template: zed::TaskTemplate { label, command, args, env, cwd },
+        template: zed::TaskTemplate {
+            label,
+            command,
+            args,
+            env,
+            cwd,
+        },
     })
 }
 
@@ -143,7 +173,10 @@ impl zed::Extension for DotnetDebugger {
         let shell_env = worktree.shell_env();
         let has_dotnet_root = shell_env.iter().any(|(k, _)| k.starts_with("DOTNET_ROOT"));
         if worktree.which("dotnet").is_none() && !has_dotnet_root {
-            return Err("the .NET SDK/runtime was not found: put `dotnet` on PATH or set DOTNET_ROOT".into());
+            return Err(
+                "the .NET SDK/runtime was not found: put `dotnet` on PATH or set DOTNET_ROOT"
+                    .into(),
+            );
         }
 
         let command = self.resolve_binary(user_provided_debug_adapter_path, worktree)?;
@@ -194,7 +227,10 @@ impl zed::Extension for DotnetDebugger {
                 });
                 let build = session::is_project_file(&launch.program).then(|| {
                     let mut env = launch.envs.clone();
-                    env.push((ENV_RUN_ARGS.to_string(), locator::encode_program_args(&launch.args)));
+                    env.push((
+                        ENV_RUN_ARGS.to_string(),
+                        locator::encode_program_args(&launch.args),
+                    ));
                     build_scenario_task(
                         "dotnet build".into(),
                         "dotnet".into(),
@@ -234,7 +270,10 @@ impl zed::Extension for DotnetDebugger {
 
         let mut env = build_task.env.clone();
         env.extend(spec.env.iter().cloned());
-        env.push((ENV_RUN_ARGS.to_string(), locator::encode_program_args(&spec.program_args)));
+        env.push((
+            ENV_RUN_ARGS.to_string(),
+            locator::encode_program_args(&spec.program_args),
+        ));
 
         Some(zed::DebugScenario {
             label: format!("Debug {resolved_label}"),
@@ -251,7 +290,11 @@ impl zed::Extension for DotnetDebugger {
         })
     }
 
-    fn run_dap_locator(&mut self, locator_name: String, build_task: zed::TaskTemplate) -> Result<zed::DebugRequest> {
+    fn run_dap_locator(
+        &mut self,
+        locator_name: String,
+        build_task: zed::TaskTemplate,
+    ) -> Result<zed::DebugRequest> {
         if locator_name != LOCATOR {
             return Err(format!("unknown locator `{locator_name}`"));
         }
@@ -259,13 +302,26 @@ impl zed::Extension for DotnetDebugger {
         let os = host_os(os);
 
         let spec = locator::parse_build_args(&build_task.args);
-        let (query_cwd, project_file) = locator::resolve_project(build_task.cwd.as_deref(), spec.project.as_deref());
+        let (query_cwd, project_file) =
+            locator::resolve_project(build_task.cwd.as_deref(), spec.project.as_deref());
 
-        let mut props = query_msbuild(os, query_cwd.as_deref(), project_file.as_deref(), &spec, None)?;
+        let mut props = query_msbuild(
+            os,
+            query_cwd.as_deref(),
+            project_file.as_deref(),
+            &spec,
+            None,
+        )?;
         if spec.framework.is_none() && props.target_frameworks.contains(';') {
             let chosen = locator::pick_framework(&props.target_frameworks)
                 .ok_or("project declares no usable target framework")?;
-            props = query_msbuild(os, query_cwd.as_deref(), project_file.as_deref(), &spec, Some(&chosen))?;
+            props = query_msbuild(
+                os,
+                query_cwd.as_deref(),
+                project_file.as_deref(),
+                &spec,
+                Some(&chosen),
+            )?;
         }
         locator::check_runnable(&props)?;
 
@@ -273,10 +329,18 @@ impl zed::Extension for DotnetDebugger {
             Some((_, raw)) => locator::decode_program_args(raw)?,
             None => Vec::new(),
         };
-        let mut envs: zed::EnvVars = build_task.env.iter().filter(|(k, _)| k != ENV_RUN_ARGS).cloned().collect();
+        let mut envs: zed::EnvVars = build_task
+            .env
+            .iter()
+            .filter(|(k, _)| k != ENV_RUN_ARGS)
+            .cloned()
+            .collect();
         // `dotnet run` with a launch profile would set these; without them ASP.NET Core
         // silently starts in Production, which is almost never what a debug session wants.
-        for (name, value) in [("ASPNETCORE_ENVIRONMENT", "Development"), ("DOTNET_ENVIRONMENT", "Development")] {
+        for (name, value) in [
+            ("ASPNETCORE_ENVIRONMENT", "Development"),
+            ("DOTNET_ENVIRONMENT", "Development"),
+        ] {
             if !envs.iter().any(|(k, _)| k.eq_ignore_ascii_case(name)) {
                 envs.push((name.to_string(), value.to_string()));
             }
