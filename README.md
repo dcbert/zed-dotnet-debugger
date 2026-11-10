@@ -2,7 +2,7 @@
 
 Debug C#, F# and VB.NET in Zed with [netcoredbg](https://github.com/Samsung/netcoredbg) (open source, DAP over stdio). Does not use Microsoft's `vsdbg`, whose licence restricts it to Microsoft products.
 
-> **Status: the code builds, and the unit tests pass in CI.** Every push and pull request runs `cargo test --workspace` plus a release build for `wasm32-wasip2`, the target Zed loads. A full interactive Zed debug session (Install Dev Extension, then launch/attach and F5 on a `dotnet run` task) still needs a manual check before marketplace release.
+> **Status: CI builds and unit tests pass, and a live Zed debug session has been verified.** Every push and pull request runs `cargo test --workspace` and a release build for `wasm32-wasip2`, the target Zed loads. In that session, launch, breakpoints, stepping, and expression evaluation were confirmed working.
 
 ## What it does
 
@@ -48,7 +48,7 @@ Then in Zed: `zed: install dev extension` and select this directory. Core tests 
 - `dotnet test` debugging is not implemented (needs the VSTest attach handshake).
 - No `launchSettings.json` support; set `env` explicitly.
 - Expression evaluation is netcoredbg's: LINQ and some lambdas fail.
-- Not exercised against a real Zed build; the exact moment Zed calls `dap_config_to_scenario` after a locator is assumed from the API docs.
+- The exact moment Zed calls `dap_config_to_scenario` after a locator is assumed from the API docs.
 
 ## Dependencies
 
