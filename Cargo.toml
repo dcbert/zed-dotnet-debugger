@@ -1,0 +1,23 @@
+[package]
+name = "dotnet_debugger"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# [EXT] zed_extension_api v0.7.0 — Zed extension host bindings — https://crates.io/crates/zed_extension_api · ⚠️ verify before production
+zed_extension_api = "0.7.0"
+dotnet-debugger-core = { path = "core" }
+
+[workspace]
+members = ["core"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

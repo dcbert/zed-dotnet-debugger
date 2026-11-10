@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "netcoredbg",
+  "oneOf": [
+    {
+      "title": "Launch",
+      "type": "object",
+      "properties": {
+        "request": { "const": "launch" },
+        "program": {
+          "type": "string",
+          "description": "Path to the built assembly (.dll) or apphost executable. A .dll is run through `dotnet`."
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Command-line arguments for the program.",
+          "default": []
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory of the program. Defaults to the worktree root."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean", "null"] },
+          "description": "Environment variables for the program. `null` leaves a variable unset.",
+          "default": {}
+        },
+        "stopAtEntry": {
+          "type": "boolean",
+          "description": "Break on the first line of Main.",
+          "default": false
+        },
+        "justMyCode": {
+          "type": "boolean",
+          "description": "Step over code that is not yours (framework and library code).",
+          "default": true
+        },
+        "enableStepFiltering": {
+          "type": "boolean",
+          "description": "Step over properties and operators when stepping into a line.",
+          "default": true
+        }
+      },
+      "required": ["request", "program"]
+    },
+    {
+      "title": "Attach",
+      "type": "object",
+      "properties": {
+        "request": { "const": "attach" },
+        "processId": {
+          "type": ["integer", "string"],
+          "description": "Id of the .NET process to attach to."
+        },
+        "justMyCode": { "type": "boolean", "default": true },
+        "enableStepFiltering": { "type": "boolean", "default": true }
+      },
+      "required": ["request", "processId"]
+    }
+  ]
+}

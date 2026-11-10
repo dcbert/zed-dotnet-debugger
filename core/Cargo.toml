@@ -1,0 +1,17 @@
+[package]
+name = "dotnet-debugger-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# [EXT] serde_json v1 — JSON config handling — https://crates.io/crates/serde_json · ⚠️ verify before production
+serde_json = "1"
+# [EXT] sha2 v0.10 — SHA-256 verification of the pinned netcoredbg archive (pure Rust) — https://crates.io/crates/sha2 · ⚠️ verify before production
+sha2 = "0.10"
+# [EXT] flate2 v1 — gzip inflate, miniz_oxide backend (pure Rust, no C) — https://crates.io/crates/flate2 · ⚠️ verify before production
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# [EXT] tar v0.4 — tar.gz reading — https://crates.io/crates/tar · ⚠️ verify before production
+tar = { version = "0.4", default-features = false }
+# [EXT] zip v9.5 — zip reading for the macOS/Windows archives — https://crates.io/crates/zip · ⚠️ verify before production
+zip = { version = "9.5.0", default-features = false, features = ["deflate"] }
