@@ -27,9 +27,15 @@ pub fn safe_relative_path(raw: &str) -> Result<Option<PathBuf>, String> {
     for component in normalized.split('/') {
         match component {
             "" | "." => {}
-            ".." => return Err(format!("archive entry {raw:?} escapes the install directory")),
+            ".." => {
+                return Err(format!(
+                    "archive entry {raw:?} escapes the install directory"
+                ))
+            }
             c if c.contains(':') => {
-                return Err(format!("archive entry {raw:?} contains a forbidden character"))
+                return Err(format!(
+                    "archive entry {raw:?} contains a forbidden character"
+                ))
             }
             c => {
                 if out.as_os_str().is_empty() && c == "__MACOSX" {
@@ -53,7 +59,10 @@ struct Budget {
 
 impl Budget {
     fn new() -> Self {
-        Self { entries: 0, total: 0 }
+        Self {
+            entries: 0,
+            total: 0,
+        }
     }
 
     fn entry(&mut self) -> Result<(), String> {
@@ -69,12 +78,16 @@ fn write_file(reader: &mut dyn Read, target: &Path, budget: &mut Budget) -> Resu
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
     }
-    let mut file = fs::File::create(target).map_err(|e| format!("create {}: {e}", target.display()))?;
+    let mut file =
+        fs::File::create(target).map_err(|e| format!("create {}: {e}", target.display()))?;
     // Bound the copy by the cap, not by the size the header claims: headers can lie.
     let written = std::io::copy(&mut reader.take(MAX_FILE_BYTES + 1), &mut file)
         .map_err(|e| format!("write {}: {e}", target.display()))?;
     if written > MAX_FILE_BYTES {
-        return Err(format!("archive entry {} exceeds {MAX_FILE_BYTES} bytes", target.display()));
+        return Err(format!(
+            "archive entry {} exceeds {MAX_FILE_BYTES} bytes",
+            target.display()
+        ));
     }
     budget.total += written;
     if budget.total > MAX_TOTAL_BYTES {
@@ -94,7 +107,9 @@ pub fn extract_tar_gz(data: &[u8], dest: &Path) -> Result<(), String> {
             .map_err(|e| format!("tar entry path: {e}"))?
             .to_string_lossy()
             .into_owned();
-        let Some(rel) = safe_relative_path(&raw)? else { continue };
+        let Some(rel) = safe_relative_path(&raw)? else {
+            continue;
+        };
         let target = dest.join(rel);
         let kind = entry.header().entry_type();
         if kind.is_dir() {
@@ -105,23 +120,30 @@ pub fn extract_tar_gz(data: &[u8], dest: &Path) -> Result<(), String> {
             continue;
         } else {
             // Links could point outside `dest` and be followed by a later entry.
-            return Err(format!("archive entry {raw:?} has unsupported type {kind:?}"));
+            return Err(format!(
+                "archive entry {raw:?} has unsupported type {kind:?}"
+            ));
         }
     }
     Ok(())
 }
 
 pub fn extract_zip(data: &[u8], dest: &Path) -> Result<(), String> {
-    let mut archive = zip::ZipArchive::new(Cursor::new(data)).map_err(|e| format!("read zip: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(Cursor::new(data)).map_err(|e| format!("read zip: {e}"))?;
     let mut budget = Budget::new();
     for index in 0..archive.len() {
         budget.entry()?;
-        let mut file = archive.by_index(index).map_err(|e| format!("read zip entry: {e}"))?;
+        let mut file = archive
+            .by_index(index)
+            .map_err(|e| format!("read zip entry: {e}"))?;
         let raw = file
             .name()
             .map_err(|e| format!("zip entry name: {e}"))?
             .into_owned();
-        let Some(rel) = safe_relative_path(&raw)? else { continue };
+        let Some(rel) = safe_relative_path(&raw)? else {
+            continue;
+        };
         let target = dest.join(rel);
         if file.is_symlink() {
             return Err(format!("archive entry {raw:?} is a symlink"));
@@ -142,7 +164,15 @@ mod tests {
 
     #[test]
     fn rejects_escaping_and_absolute_names() {
-        for bad in ["../evil", "a/../../evil", "/etc/passwd", "C:/x", "a/b:stream", "a\\..\\..\\x", "nul\0"] {
+        for bad in [
+            "../evil",
+            "a/../../evil",
+            "/etc/passwd",
+            "C:/x",
+            "a/b:stream",
+            "a\\..\\..\\x",
+            "nul\0",
+        ] {
             assert!(safe_relative_path(bad).is_err(), "{bad:?} must be rejected");
         }
     }
@@ -160,9 +190,15 @@ mod tests {
     #[test]
     fn extracts_tar_gz() {
         let dest = scratch("tar-ok");
-        let data = tar_gz(&[("netcoredbg/netcoredbg", b"bin"), ("netcoredbg/lib.so", b"lib")]);
+        let data = tar_gz(&[
+            ("netcoredbg/netcoredbg", b"bin"),
+            ("netcoredbg/lib.so", b"lib"),
+        ]);
         extract_tar_gz(&data, &dest).unwrap();
-        assert_eq!(fs::read(dest.join("netcoredbg/netcoredbg")).unwrap(), b"bin");
+        assert_eq!(
+            fs::read(dest.join("netcoredbg/netcoredbg")).unwrap(),
+            b"bin"
+        );
         assert_eq!(fs::read(dest.join("netcoredbg/lib.so")).unwrap(), b"lib");
     }
 
@@ -170,7 +206,9 @@ mod tests {
     fn tar_traversal_is_rejected_and_nothing_escapes() {
         let dest = scratch("tar-evil");
         let data = tar_gz(&[("../escaped.txt", b"x")]);
-        assert!(extract_tar_gz(&data, &dest).unwrap_err().contains("escapes"));
+        assert!(extract_tar_gz(&data, &dest)
+            .unwrap_err()
+            .contains("escapes"));
         assert!(!dest.parent().unwrap().join("escaped.txt").exists());
     }
 
@@ -182,7 +220,10 @@ mod tests {
             ("__MACOSX/netcoredbg/._netcoredbg.exe", b"fork"),
         ]);
         extract_zip(&data, &dest).unwrap();
-        assert_eq!(fs::read(dest.join("netcoredbg/netcoredbg.exe")).unwrap(), b"exe");
+        assert_eq!(
+            fs::read(dest.join("netcoredbg/netcoredbg.exe")).unwrap(),
+            b"exe"
+        );
         assert!(!dest.join("__MACOSX").exists());
     }
 

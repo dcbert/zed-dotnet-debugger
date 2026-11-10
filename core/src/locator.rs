@@ -53,9 +53,24 @@ pub fn parse_dotnet_run(args: &[String]) -> Option<RunSpec> {
         };
         let takes_value = matches!(
             flag,
-            "--project" | "-p" | "--configuration" | "-c" | "--framework" | "-f" | "--launch-profile"
-                | "-lp" | "--runtime" | "-r" | "--arch" | "-a" | "--os" | "--verbosity" | "-v"
-                | "--artifacts-path" | "--environment" | "-e"
+            "--project"
+                | "-p"
+                | "--configuration"
+                | "-c"
+                | "--framework"
+                | "-f"
+                | "--launch-profile"
+                | "-lp"
+                | "--runtime"
+                | "-r"
+                | "--arch"
+                | "-a"
+                | "--os"
+                | "--verbosity"
+                | "-v"
+                | "--artifacts-path"
+                | "--environment"
+                | "-e"
         );
         if !takes_value {
             i += 1;
@@ -111,7 +126,9 @@ pub fn parse_build_args(args: &[String]) -> RunSpec {
                 i += 1;
                 spec.framework = args.get(i).cloned();
             }
-            t if !t.starts_with('-') && spec.project.is_none() => spec.project = Some(t.to_string()),
+            t if !t.starts_with('-') && spec.project.is_none() => {
+                spec.project = Some(t.to_string())
+            }
             _ => {}
         }
         i += 1;
@@ -129,7 +146,9 @@ pub fn decode_program_args(raw: &str) -> Result<Vec<String>, String> {
 
 fn looks_like_project_file(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
-    [".csproj", ".fsproj", ".vbproj", ".sln", ".slnx", ".proj"].iter().any(|e| lower.ends_with(e))
+    [".csproj", ".fsproj", ".vbproj", ".sln", ".slnx", ".proj"]
+        .iter()
+        .any(|e| lower.ends_with(e))
 }
 
 fn is_absolute(path: &str) -> bool {
@@ -137,18 +156,33 @@ fn is_absolute(path: &str) -> bool {
 }
 
 fn join(base: &str, rel: &str) -> String {
-    let sep = if base.contains('\\') && !base.contains('/') { '\\' } else { '/' };
-    format!("{}{sep}{}", base.trim_end_matches(['/', '\\']), rel.trim_start_matches("./"))
+    let sep = if base.contains('\\') && !base.contains('/') {
+        '\\'
+    } else {
+        '/'
+    };
+    format!(
+        "{}{sep}{}",
+        base.trim_end_matches(['/', '\\']),
+        rel.trim_start_matches("./")
+    )
 }
 
 pub fn dirname(path: &str) -> Option<&str> {
     let idx = path.rfind(['/', '\\'])?;
-    if idx == 0 { Some(&path[..1]) } else { Some(&path[..idx]) }
+    if idx == 0 {
+        Some(&path[..1])
+    } else {
+        Some(&path[..idx])
+    }
 }
 
 /// Where MSBuild must run and which project file to hand it. A `--project` that is a
 /// directory (accepted by `dotnet run`) becomes the working directory instead.
-pub fn resolve_project(task_cwd: Option<&str>, project: Option<&str>) -> (Option<String>, Option<String>) {
+pub fn resolve_project(
+    task_cwd: Option<&str>,
+    project: Option<&str>,
+) -> (Option<String>, Option<String>) {
     match project {
         Some(p) if looks_like_project_file(p) => (task_cwd.map(String::from), Some(p.to_string())),
         Some(dir) => {
@@ -170,13 +204,22 @@ pub fn debuggee_cwd(task_cwd: Option<&str>, project_file: Option<&str>) -> Optio
     project_file.and_then(dirname).map(String::from)
 }
 
-pub fn msbuild_query_args(project_file: Option<&str>, spec: &RunSpec, framework_override: Option<&str>) -> Vec<String> {
+pub fn msbuild_query_args(
+    project_file: Option<&str>,
+    spec: &RunSpec,
+    framework_override: Option<&str>,
+) -> Vec<String> {
     let mut args = vec!["msbuild".to_string()];
     if let Some(p) = project_file {
         args.push(p.to_string());
     }
     args.push("-nologo".into());
-    for prop in ["TargetPath", "OutputType", "TargetFramework", "TargetFrameworks"] {
+    for prop in [
+        "TargetPath",
+        "OutputType",
+        "TargetFramework",
+        "TargetFrameworks",
+    ] {
         args.push(format!("-getProperty:{prop}"));
     }
     if let Some(c) = &spec.configuration {
@@ -190,7 +233,11 @@ pub fn msbuild_query_args(project_file: Option<&str>, spec: &RunSpec, framework_
 
 /// The process to spawn for a `dotnet ...` command that must run in `cwd`.
 /// The host API has no working-directory option, so a shell does the `cd`.
-pub fn dotnet_command(os: Os, cwd: Option<&str>, args: &[String]) -> Result<(String, Vec<String>), String> {
+pub fn dotnet_command(
+    os: Os,
+    cwd: Option<&str>,
+    args: &[String],
+) -> Result<(String, Vec<String>), String> {
     let Some(cwd) = cwd else {
         return Ok(("dotnet".into(), args.to_vec()));
     };
@@ -213,13 +260,27 @@ pub fn dotnet_command(os: Os, cwd: Option<&str>, args: &[String]) -> Result<(Str
         // cmd.exe has no positional-parameter escape hatch, so values are double-quoted and any
         // character that is still special inside quotes (`"`, `%`, `!`) is refused outright.
         Os::Windows => {
-            let forbidden = |s: &str| s.chars().any(|c| matches!(c, '"' | '%' | '!' | '\r' | '\n'));
+            let forbidden = |s: &str| {
+                s.chars()
+                    .any(|c| matches!(c, '"' | '%' | '!' | '\r' | '\n'))
+            };
             if forbidden(cwd) || args.iter().any(|a| forbidden(a)) {
-                return Err("path or argument contains a character that cannot be passed safely to cmd.exe".into());
+                return Err(
+                    "path or argument contains a character that cannot be passed safely to cmd.exe"
+                        .into(),
+                );
             }
             let quoted: Vec<String> = args.iter().map(|a| format!("\"{a}\"")).collect();
             let script = format!("cd /d \"{cwd}\" && dotnet {}", quoted.join(" "));
-            Ok(("cmd".into(), vec!["/D".into(), "/S".into(), "/C".into(), format!("\"{script}\"")]))
+            Ok((
+                "cmd".into(),
+                vec![
+                    "/D".into(),
+                    "/S".into(),
+                    "/C".into(),
+                    format!("\"{script}\""),
+                ],
+            ))
         }
     }
 }
@@ -232,15 +293,35 @@ pub struct BuildProps {
 }
 
 pub fn parse_msbuild_properties(stdout: &str) -> Result<BuildProps, String> {
-    let start = stdout.find('{').ok_or("MSBuild printed no JSON (needs .NET SDK 8.0.100 or newer)")?;
-    let json: Value = serde_json::from_str(&stdout[start..]).map_err(|e| format!("cannot parse MSBuild output: {e}"))?;
-    let props = json.get("Properties").ok_or("MSBuild output has no Properties")?;
-    let get = |k: &str| props.get(k).and_then(Value::as_str).unwrap_or("").trim().to_string();
+    let start = stdout
+        .find('{')
+        .ok_or("MSBuild printed no JSON (needs .NET SDK 8.0.100 or newer)")?;
+    let json: Value = serde_json::from_str(&stdout[start..])
+        .map_err(|e| format!("cannot parse MSBuild output: {e}"))?;
+    let props = json
+        .get("Properties")
+        .ok_or("MSBuild output has no Properties")?;
+    let get = |k: &str| {
+        props
+            .get(k)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    };
     let frameworks = {
         let many = get("TargetFrameworks");
-        if many.is_empty() { get("TargetFramework") } else { many }
+        if many.is_empty() {
+            get("TargetFramework")
+        } else {
+            many
+        }
     };
-    Ok(BuildProps { target_path: get("TargetPath"), output_type: get("OutputType"), target_frameworks: frameworks })
+    Ok(BuildProps {
+        target_path: get("TargetPath"),
+        output_type: get("OutputType"),
+        target_frameworks: frameworks,
+    })
 }
 
 /// Highest `netX.Y` wins; anything else (netstandard, netcoreapp) ranks by order of appearance.
@@ -249,12 +330,15 @@ pub fn pick_framework(list: &str) -> Option<String> {
     let mut fallback: Option<String> = None;
     for tfm in list.split(';').map(str::trim).filter(|t| !t.is_empty()) {
         fallback.get_or_insert_with(|| tfm.to_string());
-        let version = tfm.strip_prefix("net").and_then(|r| r.split('-').next()).and_then(|v| {
-            let (major, minor) = v.split_once('.').unwrap_or((v, "0"));
-            Some((major.parse::<u32>().ok()?, minor.parse::<u32>().ok()?))
-        });
+        let version = tfm
+            .strip_prefix("net")
+            .and_then(|r| r.split('-').next())
+            .and_then(|v| {
+                let (major, minor) = v.split_once('.').unwrap_or((v, "0"));
+                Some((major.parse::<u32>().ok()?, minor.parse::<u32>().ok()?))
+            });
         if let Some((maj, min)) = version {
-            if maj >= 5 && best.as_ref().map_or(true, |(a, b, _)| (maj, min) > (*a, *b)) {
+            if maj >= 5 && best.as_ref().is_none_or(|(a, b, _)| (maj, min) > (*a, *b)) {
                 best = Some((maj, min, tfm.to_string()));
             }
         }
@@ -268,7 +352,9 @@ pub fn check_runnable(props: &BuildProps) -> Result<(), String> {
     }
     match props.output_type.as_str() {
         "Exe" | "WinExe" => Ok(()),
-        other => Err(format!("project output type is {other:?}, not an executable, so there is nothing to launch")),
+        other => Err(format!(
+            "project output type is {other:?}, not an executable, so there is nothing to launch"
+        )),
     }
 }
 
@@ -282,7 +368,18 @@ mod tests {
 
     #[test]
     fn parses_a_typical_dotnet_run() {
-        let spec = parse_dotnet_run(&v(&["run", "--project", "src/Api", "-c", "Release", "--no-build", "--", "--port", "5000"])).unwrap();
+        let spec = parse_dotnet_run(&v(&[
+            "run",
+            "--project",
+            "src/Api",
+            "-c",
+            "Release",
+            "--no-build",
+            "--",
+            "--port",
+            "5000",
+        ]))
+        .unwrap();
         assert_eq!(spec.project.as_deref(), Some("src/Api"));
         assert_eq!(spec.configuration.as_deref(), Some("Release"));
         assert_eq!(spec.program_args, v(&["--port", "5000"]));
@@ -290,7 +387,16 @@ mod tests {
 
     #[test]
     fn handles_inline_values_env_and_property_switches() {
-        let spec = parse_dotnet_run(&v(&["run", "--framework=net10.0", "-p:Foo=1", "-e", "A=b", "--launch-profile", "https"])).unwrap();
+        let spec = parse_dotnet_run(&v(&[
+            "run",
+            "--framework=net10.0",
+            "-p:Foo=1",
+            "-e",
+            "A=b",
+            "--launch-profile",
+            "https",
+        ]))
+        .unwrap();
         assert_eq!(spec.framework.as_deref(), Some("net10.0"));
         assert_eq!(spec.project, None);
         assert_eq!(spec.env, vec![("A".to_string(), "b".to_string())]);
@@ -306,30 +412,54 @@ mod tests {
 
     #[test]
     fn build_args_round_trip() {
-        let spec = parse_dotnet_run(&v(&["run", "-p", "a.csproj", "-c", "Debug", "-f", "net10.0"])).unwrap();
+        let spec = parse_dotnet_run(&v(&[
+            "run", "-p", "a.csproj", "-c", "Debug", "-f", "net10.0",
+        ]))
+        .unwrap();
         let back = parse_build_args(&build_args(&spec));
-        assert_eq!((back.project, back.configuration, back.framework), (spec.project, spec.configuration, spec.framework));
+        assert_eq!(
+            (back.project, back.configuration, back.framework),
+            (spec.project, spec.configuration, spec.framework)
+        );
     }
 
     #[test]
     fn program_args_survive_the_env_round_trip() {
         let args = v(&["--name", "a b", "quote\"d", "ünï"]);
-        assert_eq!(decode_program_args(&encode_program_args(&args)).unwrap(), args);
+        assert_eq!(
+            decode_program_args(&encode_program_args(&args)).unwrap(),
+            args
+        );
         assert!(decode_program_args("not json").is_err());
     }
 
     #[test]
     fn project_directory_becomes_the_working_directory() {
-        assert_eq!(resolve_project(Some("/w"), Some("src/Api")), (Some("/w/src/Api".into()), None));
-        assert_eq!(resolve_project(Some("/w"), Some("/abs/Api")), (Some("/abs/Api".into()), None));
-        assert_eq!(resolve_project(Some("/w"), Some("a.csproj")), (Some("/w".into()), Some("a.csproj".into())));
+        assert_eq!(
+            resolve_project(Some("/w"), Some("src/Api")),
+            (Some("/w/src/Api".into()), None)
+        );
+        assert_eq!(
+            resolve_project(Some("/w"), Some("/abs/Api")),
+            (Some("/abs/Api".into()), None)
+        );
+        assert_eq!(
+            resolve_project(Some("/w"), Some("a.csproj")),
+            (Some("/w".into()), Some("a.csproj".into()))
+        );
         assert_eq!(resolve_project(None, None), (None, None));
-        assert_eq!(debuggee_cwd(None, Some("/w/src/a.csproj")).as_deref(), Some("/w/src"));
+        assert_eq!(
+            debuggee_cwd(None, Some("/w/src/a.csproj")).as_deref(),
+            Some("/w/src")
+        );
     }
 
     #[test]
     fn msbuild_query_carries_configuration_and_framework() {
-        let spec = RunSpec { configuration: Some("Release".into()), ..Default::default() };
+        let spec = RunSpec {
+            configuration: Some("Release".into()),
+            ..Default::default()
+        };
         let args = msbuild_query_args(Some("a.csproj"), &spec, Some("net10.0"));
         assert!(args.contains(&"-getProperty:TargetPath".to_string()));
         assert!(args.contains(&"-p:Configuration=Release".to_string()));
@@ -340,18 +470,32 @@ mod tests {
     #[test]
     fn unix_wrapper_never_puts_values_in_the_script() {
         let hostile = "/tmp/x; rm -rf ~ #";
-        let (cmd, argv) = dotnet_command(Os::Linux, Some(hostile), &v(&["msbuild", "$(evil).csproj"])).unwrap();
+        let (cmd, argv) =
+            dotnet_command(Os::Linux, Some(hostile), &v(&["msbuild", "$(evil).csproj"])).unwrap();
         assert_eq!(cmd, "sh");
         assert!(!argv[1].contains("rm") && !argv[1].contains("evil"));
-        assert_eq!(&argv[3..], &[hostile.to_string(), "msbuild".into(), "$(evil).csproj".into()]);
-        assert_eq!(dotnet_command(Os::Linux, None, &v(&["msbuild"])).unwrap().0, "dotnet");
+        assert_eq!(
+            &argv[3..],
+            &[
+                hostile.to_string(),
+                "msbuild".into(),
+                "$(evil).csproj".into()
+            ]
+        );
+        assert_eq!(
+            dotnet_command(Os::Linux, None, &v(&["msbuild"])).unwrap().0,
+            "dotnet"
+        );
     }
 
     #[test]
     fn windows_wrapper_refuses_cmd_metacharacters() {
         assert!(dotnet_command(Os::Windows, Some("C:\\a\\b"), &v(&["msbuild"])).is_ok());
         for bad in ["C:\\a\"&calc", "C:\\%PATH%", "C:\\a!b"] {
-            assert!(dotnet_command(Os::Windows, Some(bad), &v(&["msbuild"])).is_err(), "{bad}");
+            assert!(
+                dotnet_command(Os::Windows, Some(bad), &v(&["msbuild"])).is_err(),
+                "{bad}"
+            );
         }
         assert!(dotnet_command(Os::Windows, Some("C:\\a"), &v(&["x\"y"])).is_err());
     }
@@ -368,15 +512,30 @@ mod tests {
 
     #[test]
     fn library_projects_are_not_launchable() {
-        let props = BuildProps { target_path: "/x/Lib.dll".into(), output_type: "Library".into(), target_frameworks: String::new() };
-        assert!(check_runnable(&props).unwrap_err().contains("not an executable"));
+        let props = BuildProps {
+            target_path: "/x/Lib.dll".into(),
+            output_type: "Library".into(),
+            target_frameworks: String::new(),
+        };
+        assert!(check_runnable(&props)
+            .unwrap_err()
+            .contains("not an executable"));
     }
 
     #[test]
     fn picks_the_newest_modern_framework() {
-        assert_eq!(pick_framework("net8.0;net10.0;netstandard2.0").as_deref(), Some("net10.0"));
-        assert_eq!(pick_framework("net9.0-windows;net8.0").as_deref(), Some("net9.0-windows"));
-        assert_eq!(pick_framework("netstandard2.0").as_deref(), Some("netstandard2.0"));
+        assert_eq!(
+            pick_framework("net8.0;net10.0;netstandard2.0").as_deref(),
+            Some("net10.0")
+        );
+        assert_eq!(
+            pick_framework("net9.0-windows;net8.0").as_deref(),
+            Some("net9.0-windows")
+        );
+        assert_eq!(
+            pick_framework("netstandard2.0").as_deref(),
+            Some("netstandard2.0")
+        );
         assert_eq!(pick_framework(""), None);
     }
 }

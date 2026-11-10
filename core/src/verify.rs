@@ -37,6 +37,8 @@ mod tests {
     fn mismatch_is_rejected_and_case_is_ignored() {
         let good = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
         assert!(verify_sha256(b"abc", good).is_ok());
-        assert!(verify_sha256(b"abd", good).unwrap_err().contains("checksum mismatch"));
+        assert!(verify_sha256(b"abd", good)
+            .unwrap_err()
+            .contains("checksum mismatch"));
     }
 }

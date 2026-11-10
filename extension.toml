@@ -3,8 +3,26 @@ name = ".NET Debugger"
 description = "Debug C#, F# and VB.NET with netcoredbg: checksum-verified install, launch/attach, and F5 on `dotnet run` tasks."
 version = "0.1.0"
 schema_version = 1
-authors = []
+authors = ["Davide Bert <dc.bert@outlook.com>"]
+repository = "https://github.com/dcbert/zed-dotnet-debugger"
 
 [debug_adapters.netcoredbg]
 
 [debug_locators.dotnet]
+
+# Commands passed to zed::process::Command in the locator (see locator::dotnet_command).
+# `dotnet` runs directly when there is no working directory; otherwise a shell `cd`s first.
+[[capabilities]]
+kind = "process:exec"
+command = "dotnet"
+args = ["**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "sh"
+args = ["**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "cmd"
+args = ["**"]

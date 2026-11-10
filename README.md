@@ -2,7 +2,7 @@
 
 Debug C#, F# and VB.NET in Zed with [netcoredbg](https://github.com/Samsung/netcoredbg) (open source, DAP over stdio). Does not use Microsoft's `vsdbg`, whose licence restricts it to Microsoft products.
 
-> **Status: written, not yet compiled or tested.** It was authored in a sandbox with no C linker, so neither `cargo test` nor `cargo build` has run. Run the steps under *Verify* first and expect small compile fixes.
+> **Status: the code builds, and the unit tests pass in CI.** Every push and pull request runs `cargo test --workspace` plus a release build for `wasm32-wasip2`, the target Zed loads. A full interactive Zed debug session (Install Dev Extension, then launch/attach and F5 on a `dotnet run` task) still needs a manual check before marketplace release.
 
 ## What it does
 

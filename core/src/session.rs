@@ -155,7 +155,11 @@ pub fn launch_config(p: &LaunchParams) -> Value {
     if let Some(cwd) = &p.cwd {
         obj.insert("cwd".into(), cwd.clone().into());
     }
-    let env: Map<String, Value> = p.env.iter().map(|(k, v)| (k.clone(), v.clone().into())).collect();
+    let env: Map<String, Value> = p
+        .env
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone().into()))
+        .collect();
     obj.insert("env".into(), Value::Object(env));
     if let Some(stop) = p.stop_on_entry {
         obj.insert("stopAtEntry".into(), stop.into());
@@ -172,7 +176,9 @@ pub fn attach_config(process_id: Option<u32>) -> Result<Value, String> {
 /// A `.csproj` given as the "program" means "build this project, then debug its output".
 pub fn is_project_file(program: &str) -> bool {
     let lower = program.to_ascii_lowercase();
-    [".csproj", ".fsproj", ".vbproj"].iter().any(|ext| lower.ends_with(ext))
+    [".csproj", ".fsproj", ".vbproj"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
 }
 
 #[cfg(test)]
@@ -182,15 +188,22 @@ mod tests {
 
     #[test]
     fn request_kind_requires_a_known_value() {
-        assert_eq!(request_kind(&json!({"request":"launch"})).unwrap(), Kind::Launch);
-        assert_eq!(request_kind(&json!({"request":"attach"})).unwrap(), Kind::Attach);
+        assert_eq!(
+            request_kind(&json!({"request":"launch"})).unwrap(),
+            Kind::Launch
+        );
+        assert_eq!(
+            request_kind(&json!({"request":"attach"})).unwrap(),
+            Kind::Attach
+        );
         assert!(request_kind(&json!({"request":"nope"})).is_err());
         assert!(request_kind(&json!({})).is_err());
     }
 
     #[test]
     fn launch_defaults_are_made_explicit() {
-        let (kind, v) = normalize(json!({"request":"launch","program":"bin/App.dll"}), "/work").unwrap();
+        let (kind, v) =
+            normalize(json!({"request":"launch","program":"bin/App.dll"}), "/work").unwrap();
         assert_eq!(kind, Kind::Launch);
         assert_eq!(v["cwd"], "/work");
         assert_eq!(v["args"], json!([]));
@@ -221,7 +234,10 @@ mod tests {
         assert!(bad(json!({"request":"launch","program":" "})).contains("program"));
         assert!(bad(json!({"request":"launch","program":"a","args":"x y"})).contains("array"));
         assert!(bad(json!({"request":"launch","program":"a","env":{"A=B":"1"}})).contains("name"));
-        assert!(bad(json!({"request":"launch","program":"a","justMyCode":"yes"})).contains("justMyCode"));
+        assert!(
+            bad(json!({"request":"launch","program":"a","justMyCode":"yes"}))
+                .contains("justMyCode")
+        );
         assert!(bad(json!({"request":"launch","program":"a\u{0}b"})).contains("program"));
     }
 
@@ -231,7 +247,13 @@ mod tests {
             let (_, v) = normalize(json!({"request":"attach","processId":pid}), "/w").unwrap();
             assert_eq!(v["processId"], 42);
         }
-        for pid in [json!(0), json!(-1), json!("abc"), json!(4294967295u64), json!(null)] {
+        for pid in [
+            json!(0),
+            json!(-1),
+            json!("abc"),
+            json!(4294967295u64),
+            json!(null),
+        ] {
             assert!(normalize(json!({"request":"attach","processId":pid}), "/w").is_err());
         }
         assert!(normalize(json!({"request":"attach"}), "/w").is_err());
